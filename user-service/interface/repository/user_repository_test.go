@@ -126,11 +126,11 @@ func Test_userRepo_FindByid(t *testing.T) {
 	if err != nil {
 		t.Errorf("find by id returned an error: %s", err)
 	}
-	if result.GetUser().GetId() != int64(1) {
-		t.Errorf("create user returned a wrong id; expected 1 but got %d", result.GetUser().GetId())
+	if int64(result.Id) != 1 {
+		t.Errorf("create user returned a wrong id; expected 1 but got %d", result.Id)
 	}
-	if result.GetUser().GetFname() != "ryan" {
-		t.Errorf("create user returned a wrong first name; expected ryan but got %s", result.GetUser().GetFname())
+	if result.Fname != "ryan" {
+		t.Errorf("create user returned a wrong first name; expected ryan but got %s", result.Fname)
 	}
 }
 
@@ -169,8 +169,8 @@ func Test_userRepo_UpdateById(t *testing.T) {
 	}
 
 	user, _ := userRepo.FindById(1)
-	if user.GetUser().GetLname() != "conor" {
-		t.Errorf("last name update failed expect conor but got %s", user.GetUser().GetLname())
+	if user.Lname != "conor" {
+		t.Errorf("last name update failed expect conor but got %s", user.Lname)
 	}
 }
 

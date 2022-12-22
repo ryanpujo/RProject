@@ -3,7 +3,6 @@ package interactor
 import (
 	"user-service/models"
 	"user-service/usecases/repository"
-	"user-service/user-proto/users"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -13,29 +12,32 @@ type userInteractor struct {
 }
 
 type UserInteractor interface {
-	Create(user *models.UserPayload) (int, error)
-	FindById(id int64) (*users.UserResponse, error)
+	Create(user *models.UserPayload) (int64, error)
+	FindById(id int64) (*models.User, error)
 	FindByUsername(username string) (*models.User, error)
 	FindUsers() ([]*models.User, error)
 	Update(user *models.UserPayload) error
-	DeleteById(id int) error
+	DeleteById(id int64) error
 }
 
 func NewUserInteractor(userRepo repository.UserRepository) UserInteractor {
 	return &userInteractor{UserRepo: userRepo}
 }
 
-func (ui *userInteractor) Create(user *models.UserPayload) (id int, err error) {
+func (ui *userInteractor) Create(user *models.UserPayload) (int64, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return
+		return 0, err
 	}
 	user.Password = string(hash)
-	id, err = ui.UserRepo.Create(user)
-	return
+	id, err := ui.UserRepo.Create(user)
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
 }
 
-func (ui *userInteractor) FindById(id int64) (user *users.UserResponse, err error) {
+func (ui *userInteractor) FindById(id int64) (user *models.User, err error) {
 	user, err = ui.UserRepo.FindById(id)
 	return
 }
@@ -50,7 +52,7 @@ func (ui *userInteractor) Update(user *models.UserPayload) (err error) {
 	return
 }
 
-func (ui *userInteractor) DeleteById(id int) (err error) {
+func (ui *userInteractor) DeleteById(id int64) (err error) {
 	err = ui.UserRepo.DeleteById(id)
 	return
 }

@@ -2,14 +2,13 @@ package repository
 
 import (
 	"user-service/models"
-	"user-service/user-proto/users"
 )
 
 type UserRepository interface {
-	Create(user *models.UserPayload) (int, error)
-	FindById(id int64) (*users.UserResponse, error)
+	Create(user *models.UserPayload) (int64, error)
+	FindById(id int64) (*models.User, error)
 	FindUsers() ([]*models.User, error)
 	FindByUsername(username string) (*models.User, error)
-	DeleteById(id int) error
+	DeleteById(id int64) error
 	Update(user *models.UserPayload) error
 }

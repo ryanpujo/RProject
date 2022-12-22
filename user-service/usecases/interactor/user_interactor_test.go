@@ -6,7 +6,6 @@ import (
 	"testing"
 	"user-service/models"
 	"user-service/usecases/interactor"
-	"user-service/user-proto/users"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -16,14 +15,14 @@ type mockUserRepo struct {
 	mock.Mock
 }
 
-func (ui *mockUserRepo) Create(user *models.UserPayload) (id int, err error) {
+func (ui *mockUserRepo) Create(user *models.UserPayload) (int64, error) {
 	args := ui.Called(user)
-	return args.Get(0).(int), args.Error(1)
+	return args.Get(0).(int64), args.Error(1)
 }
 
-func (ui *mockUserRepo) FindById(id int64) (user *users.UserResponse, err error) {
+func (ui *mockUserRepo) FindById(id int64) (user *models.User, err error) {
 	args := ui.Called(id)
-	return args.Get(0).(*users.UserResponse), args.Error(1)
+	return args.Get(0).(*models.User), args.Error(1)
 }
 
 func (ui *mockUserRepo) FindUsers() (users []*models.User, err error) {
@@ -44,7 +43,7 @@ func (ui *mockUserRepo) Update(user *models.UserPayload) (err error) {
 	return
 }
 
-func (ui *mockUserRepo) DeleteById(id int) (err error) {
+func (ui *mockUserRepo) DeleteById(id int64) (err error) {
 	return
 }
 
@@ -70,48 +69,60 @@ func Test_userInteractor_Create(t *testing.T) {
 		Email:    "ryanpujo",
 		Password: "secret",
 	}
-	mockRepo.On("Create", &user).Return(1, nil).Once()
-
-	result, err := userInteractorTest.Create(&user)
-
-	require.Equal(t, 1, result)
-	require.NoError(t, err)
-}
-
-func Test_userInteractor_Create_Failed(t *testing.T) {
-	user := models.UserPayload{
-		Fname:    "ryan",
-		Lname:    "pujo",
-		Username: "ryanpujo",
-		Email:    "ryanpujo",
-		Password: "secret",
+	testTable := map[string]struct {
+		payload models.UserPayload
+		arrange func(t *testing.T)
+		assert  func(t *testing.T, err error, id int64)
+	}{
+		"success create": {
+			payload: user,
+			arrange: func(t *testing.T) {
+				mockRepo.On("Create", mock.Anything).Return(int64(1), nil).Once()
+			},
+			assert: func(t *testing.T, err error, id int64) {
+				require.NoError(t, err)
+				require.Equal(t, int64(1), id)
+			},
+		},
+		"fail create": {
+			payload: user,
+			arrange: func(t *testing.T) {
+				mockRepo.On("Create", mock.Anything).Return(int64(0), errors.New("got error")).Once()
+			},
+			assert: func(t *testing.T, err error, id int64) {
+				require.Error(t, err)
+				require.Equal(t, int64(0), id)
+			},
+		},
 	}
-	mockRepo.On("Create", &user).Return(0, errors.New("got error"))
 
-	result, err := userInteractorTest.Create(&user)
+	for k, v := range testTable {
+		t.Run(k, func(t *testing.T) {
+			v.arrange(t)
 
-	require.Equal(t, 0, result)
-	require.Error(t, err)
+			result, err := userInteractorTest.Create(&v.payload)
+
+			v.assert(t, err, int64(result))
+		})
+	}
 }
 
 func Test_userInteractor_FindById(t *testing.T) {
-	bio := users.User{
+	userTest := models.User{
 		Fname:    "ryan",
 		Lname:    "pujo",
 		Username: "ryanpujo",
 		Email:    "ryanpujo",
 	}
-	userTest := users.UserResponse{
-		User: &bio,
-	}
+
 	mockRepo.On("FindById", int64(1)).Return(&userTest, nil).Once()
 	user, err := userInteractorTest.FindById(int64(1))
 	if err != nil {
 		t.Errorf("failed to retrieve user by id 1: %s", err)
 	}
 
-	if user.GetUser().GetFname() != userTest.GetUser().GetFname() {
-		t.Errorf("wrong name; expect %s but got %s", userTest.GetUser().GetFname(), user.GetUser().GetFname())
+	if user.Fname != userTest.Fname {
+		t.Errorf("wrong name; expect %s but got %s", userTest.Fname, user.Fname)
 	}
 }
 

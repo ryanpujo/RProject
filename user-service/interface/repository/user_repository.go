@@ -6,9 +6,6 @@ import (
 	"time"
 	"user-service/models"
 	"user-service/usecases/repository"
-	"user-service/user-proto/users"
-
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type userRepository struct {
@@ -19,7 +16,7 @@ func NewUserRepository(db *sql.DB) repository.UserRepository {
 	return &userRepository{db}
 }
 
-func (ur *userRepository) Create(user *models.UserPayload) (id int, err error) {
+func (ur *userRepository) Create(user *models.UserPayload) (id int64, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -39,28 +36,26 @@ func (ur *userRepository) Create(user *models.UserPayload) (id int, err error) {
 	return
 }
 
-func (ur *userRepository) FindById(id int64) (user *users.UserResponse, err error) {
+func (ur *userRepository) FindById(id int64) (*models.User, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	stmt := `select id, first_name, last_name, email, username, created_at, updated_at from users where id = $1`
+	stmt := `select id, first_name, last_name, email, username, password, created_at, updated_at from users where id = $1`
 	row := ur.db.QueryRowContext(ctx, stmt, id)
-	var result users.User
-	created := result.GetCreatedAt().AsTime()
-	updated := result.GetUpdatedAt().AsTime()
-	err = row.Scan(
+	var result models.User
+	err := row.Scan(
 		&result.Id,
 		&result.Fname,
 		&result.Lname,
 		&result.Email,
 		&result.Username,
-		&created,
-		&updated,
+		&result.Password,
+		&result.CreatedAt,
+		&result.UpdatedAt,
 	)
-	result.CreatedAt = timestamppb.New(created)
-	result.UpdatedAt = timestamppb.New(updated)
-
-	user = &users.UserResponse{User: &result}
-	return
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 func (ur *userRepository) FindUsers() (users []*models.User, err error) {
@@ -92,7 +87,7 @@ func (ur *userRepository) FindUsers() (users []*models.User, err error) {
 	return
 }
 
-func (ur *userRepository) DeleteById(id int) (err error) {
+func (ur *userRepository) DeleteById(id int64) (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 

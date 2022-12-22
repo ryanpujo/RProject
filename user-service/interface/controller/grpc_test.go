@@ -23,16 +23,16 @@ type mockInteractor struct {
 	mock.Mock
 }
 
-func (m *mockInteractor) Create(user *models.UserPayload) (int, error) {
+func (m *mockInteractor) Create(user *models.UserPayload) (int64, error) {
 	args := m.Called()
-	return args.Get(0).(int), args.Error(1)
+	return args.Get(0).(int64), args.Error(1)
 }
 
-func (m *mockInteractor) FindById(id int64) (*users.UserResponse, error) {
+func (m *mockInteractor) FindById(id int64) (*models.User, error) {
 	args := m.Called(id)
-	var user *users.UserResponse
+	var user *models.User
 	if args.Get(0) != nil {
-		user = args.Get(0).(*users.UserResponse)
+		user = args.Get(0).(*models.User)
 	}
 	return user, args.Error(1)
 }
@@ -47,7 +47,7 @@ func (m *mockInteractor) Update(user *models.UserPayload) error {
 	return args.Error(0)
 }
 
-func (m *mockInteractor) DeleteById(id int) error {
+func (m *mockInteractor) DeleteById(id int64) error {
 	args := m.Called()
 	return args.Error(0)
 }
@@ -106,7 +106,7 @@ func Test_userServer_CreateUser(t *testing.T) {
 		"success api call": {
 			jsonReq: jsonReq,
 			arrange: func(t *testing.T) {
-				mocking.On("Create", mock.Anything).Return(1, nil).Once()
+				mocking.On("Create", mock.Anything).Return(int64(1), nil).Once()
 			},
 			assert: func(t *testing.T, e error, id int64) {
 				require.Equal(t, int64(1), id)
@@ -116,7 +116,7 @@ func Test_userServer_CreateUser(t *testing.T) {
 		"fail api call": {
 			jsonReq: jsonReq,
 			arrange: func(t *testing.T) {
-				mocking.On("Create", mock.Anything).Return(0, errors.New("got error")).Once()
+				mocking.On("Create", mock.Anything).Return(int64(0), errors.New("got error")).Once()
 			},
 			assert: func(t *testing.T, e error, id int64) {
 				require.Zero(t, id)
@@ -140,25 +140,27 @@ func Test_userServer_CreateUser(t *testing.T) {
 }
 
 func Test_userServer_FindById(t *testing.T) {
-	user := &users.User{
-		Fname:    "ryan",
-		Lname:    "pujo",
-		Username: "ryanpujo",
-		Email:    "ryanpujo@yahoo.com",
+	user := &models.User{
+		Id:        1,
+		Fname:     "ryan",
+		Lname:     "pujo",
+		Username:  "ryanpujo",
+		Email:     "ryanpujo@yahoo.com",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
-	id := users.Userid{Id: 1}
-	res := &users.UserResponse{User: user}
+	id := users.Userid{Id: int64(1)}
 	testTable := map[string]struct {
 		arrange func(t *testing.T)
 		assert  func(t *testing.T, e error, actual *users.UserResponse)
 	}{
 		"succes api call": {
 			arrange: func(t *testing.T) {
-				mocking.On("FindById", int64(1)).Return(res, nil).Once()
+				mocking.On("FindById", int64(1)).Return(user, nil).Once()
 			},
 			assert: func(t *testing.T, e error, actual *users.UserResponse) {
 				require.NoError(t, e)
-				require.Equal(t, res.GetUser().GetFname(), actual.GetUser().GetFname())
+				require.Equal(t, user.Fname, actual.GetUser().GetFname())
 			},
 		},
 		"failed api call": {
