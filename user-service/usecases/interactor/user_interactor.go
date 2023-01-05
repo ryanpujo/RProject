@@ -20,15 +20,12 @@ type UserInteractor interface {
 	DeleteById(id int64) error
 }
 
-func NewUserInteractor(userRepo repository.UserRepository) UserInteractor {
+func NewUserInteractor(userRepo repository.UserRepository) *userInteractor {
 	return &userInteractor{UserRepo: userRepo}
 }
 
 func (ui *userInteractor) Create(user *models.UserPayload) (int64, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return 0, err
-	}
+	hash, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	user.Password = string(hash)
 	id, err := ui.UserRepo.Create(user)
 	if err != nil {

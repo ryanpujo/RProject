@@ -14,7 +14,7 @@ type registry struct {
 	Db *sql.DB
 }
 
-func NewRegistry(db *sql.DB) Registry {
+func NewRegistry(db *sql.DB) *registry {
 	return &registry{Db: db}
 }
 

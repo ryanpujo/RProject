@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"time"
-	"user-service/config"
 	"user-service/user-proto/users"
 
 	"github.com/gin-gonic/gin"
@@ -20,34 +19,42 @@ import (
 )
 
 type application struct {
-	Config   config.Config
+	Config   config
 	InfoLog  *log.Logger
 	ErrorLog *log.Logger
 }
 
 func Application() application {
-	var cfg config.Config
 	return application{
-		Config:   cfg,
+		Config: config{
+			Port:     helper.GetEnvInt("PORT"),
+			Dsn:      os.Getenv("DSN"),
+			Env:      os.Getenv("ENV"),
+			Api:      os.Getenv("API"),
+			Host:     os.Getenv("HOST"),
+			GrpcPort: helper.GetEnvInt("GRPC_PORT"),
+		},
 		InfoLog:  log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime),
 		ErrorLog: log.New(os.Stdout, "ERROR\t", log.Ldate|log.Ltime),
 	}
 }
 
-func (app *application) StartGrpcServer(grpcServer users.UserServiceServer) {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", helper.GetEnvInt("GRPC_PORT")))
+func (app *application) StartGrpcServer(grpcServer users.UserServiceServer) func() {
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", app.Config.GrpcPort))
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	s := grpc.NewServer()
-
 	users.RegisterUserServiceServer(s, grpcServer)
 
 	app.InfoLog.Printf("starting server on %d mode on port %d", helper.GetEnvInt("GRPC_PORT"), helper.GetEnvInt("GRPC_PORT"))
 
 	if err := s.Serve(lis); err != nil {
 		log.Fatal(err)
+	}
+	return func() {
+		lis.Close()
+		s.Stop()
 	}
 }
 
@@ -85,7 +92,7 @@ func (app *application) ConnectToDb() (db *sql.DB) {
 	var err error
 	count := 0
 	for db == nil {
-		db, err = openDb(os.Getenv("DSN"))
+		db, err = openDb(app.Config.Dsn)
 		if err != nil {
 			app.InfoLog.Println("postgres is not ready yet")
 		}

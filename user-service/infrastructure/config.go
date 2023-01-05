@@ -1,19 +1,20 @@
-package config
+package infrastructure
 
 import (
 	"helper"
 	"os"
 )
 
-type Config struct {
-	Port int
-	Env  string
-	Api  string
-	Host string
-	Dsn  string
+type config struct {
+	Port     int
+	GrpcPort int
+	Env      string
+	Api      string
+	Host     string
+	Dsn      string
 }
 
-func (c *Config) Setup() {
+func (c *config) Setup() {
 	c.Port = helper.GetEnvInt("PORT")
 	c.Dsn = os.Getenv("DSN")
 	c.Env = os.Getenv("ENV")

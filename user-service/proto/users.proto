@@ -35,5 +35,5 @@ service UserService {
   rpc FindById (Userid) returns (UserResponse);
   rpc FindUsers (google.protobuf.Empty) returns (stream UserResponse);
   rpc Update (UserPayload) returns (google.protobuf.Empty);
-  rpc DeleteByid (Userid) returns (google.protobuf.Empty);
+  rpc DeleteById (Userid) returns (google.protobuf.Empty);
 }

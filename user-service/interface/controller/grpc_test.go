@@ -15,8 +15,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type mockInteractor struct {
@@ -39,7 +43,11 @@ func (m *mockInteractor) FindById(id int64) (*models.User, error) {
 
 func (m *mockInteractor) FindUsers() ([]*models.User, error) {
 	args := m.Called()
-	return args.Get(0).([]*models.User), args.Error(1)
+	var users []*models.User
+	if args.Get(0) != nil {
+		users = args.Get(0).([]*models.User)
+	}
+	return users, args.Error(1)
 }
 
 func (m *mockInteractor) Update(user *models.UserPayload) error {
@@ -70,7 +78,9 @@ func buffdialer(ctx context.Context, s string) (net.Conn, error) {
 }
 func TestMain(m *testing.M) {
 	lis = bufconn.Listen(1024 * 1024)
+	defer lis.Close()
 	s := grpc.NewServer()
+	defer s.Stop()
 	mocking = new(mockInteractor)
 	users.RegisterUserServiceServer(s, controller.NewUserServer(mocking))
 	conn, err := grpc.DialContext(context.Background(), "bufnet", grpc.WithContextDialer(buffdialer), grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -184,6 +194,149 @@ func Test_userServer_FindById(t *testing.T) {
 			res, err := client.FindById(ctx, &id)
 
 			v.assert(t, err, res)
+		})
+	}
+}
+
+func Test_userServer_FindUsers(t *testing.T) {
+	user := &models.User{
+		Id:        1,
+		Fname:     "ryan",
+		Lname:     "pujo",
+		Username:  "ryanpujo",
+		Email:     "ryanpujo@yahoo.com",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	user1 := &models.User{
+		Id:        1,
+		Fname:     "ryan",
+		Lname:     "pujo",
+		Username:  "ryanpujo",
+		Email:     "ryanpujo@yahoo.com",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	allUsers := []*models.User{user, user1}
+	testTable := map[string]struct {
+		arrange func(t *testing.T)
+		assert  func(t *testing.T, err error, actual users.UserService_FindUsersClient)
+	}{
+		"successful call": {
+			arrange: func(t *testing.T) {
+				mocking.On("FindUsers").Return(allUsers, nil).Once()
+			},
+			assert: func(t *testing.T, err error, actual users.UserService_FindUsersClient) {
+				require.NoError(t, err)
+				require.NotNil(t, actual)
+				res, _ := actual.Recv()
+				require.Equal(t, res.GetUser().Fname, user.Fname)
+			},
+		},
+		"failed call": {
+			arrange: func(t *testing.T) {
+				mocking.On("FindUsers").Return(nil, status.Error(codes.DataLoss, "no user found")).Once()
+			},
+			assert: func(t *testing.T, err error, actual users.UserService_FindUsersClient) {
+				res, _ := actual.Recv()
+				require.Empty(t, res.GetUser().GetFname())
+			},
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	for k, v := range testTable {
+		t.Run(k, func(t *testing.T) {
+			v.arrange(t)
+
+			result, err := client.FindUsers(ctx, &emptypb.Empty{})
+
+			v.assert(t, err, result)
+		})
+	}
+}
+
+func Test_userServer_Update(t *testing.T) {
+	user := users.User{
+		Id:        1,
+		Fname:     "ryan",
+		Lname:     "pujo",
+		Username:  "ryanpujo",
+		Email:     "ryanpujo@yahoo.com",
+		CreatedAt: timestamppb.New(time.Now()),
+		UpdatedAt: timestamppb.New(time.Now()),
+	}
+	payload := users.UserPayload{
+		User:     &user,
+		Password: "ksjdjnejn",
+	}
+	testTable := map[string]struct {
+		arrange func(t *testing.T)
+		assert  func(t *testing.T, err error)
+	}{
+		"success call": {
+			arrange: func(t *testing.T) {
+				mocking.On("Update", mock.Anything).Return(nil).Once()
+			},
+			assert: func(t *testing.T, err error) {
+				require.NoError(t, err)
+			},
+		},
+		"failed call": {
+			arrange: func(t *testing.T) {
+				mocking.On("Update", mock.Anything).Return(errors.New("got an error")).Once()
+			},
+			assert: func(t *testing.T, err error) {
+				require.Error(t, err)
+				require.Equal(t, "rpc error: code = InvalidArgument desc = got an error", err.Error())
+			},
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	for k, v := range testTable {
+		t.Run(k, func(t *testing.T) {
+			v.arrange(t)
+
+			_, err := client.Update(ctx, &payload)
+
+			v.assert(t, err)
+		})
+	}
+}
+
+func Test_userServer_DeleteById(t *testing.T) {
+	testTable := map[string]struct {
+		arrange func(t *testing.T)
+		assert  func(t *testing.T, err error)
+	}{
+		"success call": {
+			arrange: func(t *testing.T) {
+				mocking.On("DeleteById", mock.Anything).Return(nil).Once()
+			},
+			assert: func(t *testing.T, err error) {
+				require.NoError(t, err)
+			},
+		},
+		"failed call": {
+			arrange: func(t *testing.T) {
+				mocking.On("DeleteById", mock.Anything).Return(errors.New("got an error")).Once()
+			},
+			assert: func(t *testing.T, err error) {
+				require.Error(t, err)
+				require.Equal(t, "rpc error: code = InvalidArgument desc = got an error", err.Error())
+			},
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	for k, v := range testTable {
+		t.Run(k, func(t *testing.T) {
+			v.arrange(t)
+
+			_, err := client.DeleteById(ctx, &users.Userid{Id: 1})
+
+			v.assert(t, err)
 		})
 	}
 }

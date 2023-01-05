@@ -4,6 +4,7 @@ import (
 	"broker-service/user-proto/users"
 	"context"
 	"helper"
+	"io"
 	"net/http"
 	"time"
 	"user-service/models"
@@ -46,13 +47,18 @@ func NewRouter() *gin.Engine {
 		for {
 			result, err := stream.Recv()
 			if err != nil {
-				break
+				if err == io.EOF {
+					break
+				}
+				res.Error = true
+				res.Message = err.Error()
+				ctx.JSON(http.StatusBadRequest, res)
+				return
 			}
 			data = append(data, result.GetUser())
 		}
 
 		res.Error = false
-		res.Message = "NEWLY USER CREATED"
 		res.Data = data
 		ctx.JSON(http.StatusCreated, res)
 	})

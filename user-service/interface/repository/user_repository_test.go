@@ -61,7 +61,6 @@ func TestMain(m *testing.M) {
 	// get a resource (docker image)
 	resource, err = pool.RunWithOptions(&opt)
 	if err != nil {
-		_ = pool.Purge(resource)
 		log.Fatalf("could not start resource: %s", err)
 	}
 

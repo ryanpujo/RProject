@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"time"
 	"user-service/models"
 	"user-service/usecases/interactor"
 	"user-service/user-proto/users"
@@ -17,7 +18,7 @@ type userServer struct {
 	Interactor interactor.UserInteractor
 }
 
-func NewUserServer(i interactor.UserInteractor) users.UserServiceServer {
+func NewUserServer(i interactor.UserInteractor) *userServer {
 	return &userServer{Interactor: i}
 }
 
@@ -62,7 +63,7 @@ func (u *userServer) FindById(ctx context.Context, id *users.Userid) (*users.Use
 func (u *userServer) FindUsers(empty *emptypb.Empty, stream users.UserService_FindUsersServer) error {
 	data, err := u.Interactor.FindUsers()
 	if err != nil {
-		return status.Errorf(codes.DataLoss, "failed to retrieve error")
+		return status.Errorf(codes.DataLoss, err.Error())
 	}
 	for _, v := range data {
 		user := users.UserResponse{
@@ -77,9 +78,32 @@ func (u *userServer) FindUsers(empty *emptypb.Empty, stream users.UserService_Fi
 			},
 		}
 		err = stream.Send(&user)
-		if err != nil {
-			return status.Errorf(codes.DataLoss, "failed to retrieve error")
-		}
 	}
-	return nil
+	return err
+}
+
+func (u *userServer) Update(context context.Context, payload *users.UserPayload) (*emptypb.Empty, error) {
+	updateUser := payload.GetUser()
+	model := models.UserPayload{
+		Fname:     updateUser.GetFname(),
+		Lname:     updateUser.GetLname(),
+		Username:  updateUser.GetUsername(),
+		Email:     updateUser.GetEmail(),
+		Password:  payload.GetPassword(),
+		Id:        int(updateUser.GetId()),
+		UpdatedAt: time.Now(),
+	}
+	err := u.Interactor.Update(&model)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (u *userServer) DeleteById(context context.Context, id *users.Userid) (*emptypb.Empty, error) {
+	err := u.Interactor.DeleteById(id.GetId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	return &emptypb.Empty{}, nil
 }

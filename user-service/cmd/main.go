@@ -10,5 +10,6 @@ func main() {
 	db := app.ConnectToDb()
 	defer db.Close()
 	registry := registry.NewRegistry(db)
-	app.StartGrpcServer(registry.NewUserServer())
+	close := app.StartGrpcServer(registry.NewUserServer())
+	defer close()
 }
